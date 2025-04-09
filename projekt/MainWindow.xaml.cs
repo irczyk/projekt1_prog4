@@ -1,69 +1,82 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
+using LiveCharts;
+using LiveCharts.Wpf;
 
-namespace projekt
+namespace WaterTrackerWPF
 {
     public partial class MainWindow : Window
     {
-        private List<Measurement> measurements = new List<Measurement>();
-        private DataManager dataManager = new DataManager("data.json");
-
         public MainWindow()
         {
             InitializeComponent();
-            LoadData();
-        }
-
-        private void LoadData()
-        {
-            measurements = dataManager.LoadData();
-            MeasurementList.Items.Clear();
-            foreach (var measurement in measurements)
-            {
-                MeasurementList.Items.Add($"{measurement.Date}: Woda: {measurement.WaterUsage} m³, Energia: {measurement.EnergyUsage} kWh");
-            }
+            RefreshList();
         }
 
         private void AddMeasurement_Click(object sender, RoutedEventArgs e)
         {
-            if (double.TryParse(WaterInput.Text, out double water) && double.TryParse(EnergyInput.Text, out double energy))
+            if (!double.TryParse(LitersInput.Text, out double liters) || liters < 0)
             {
-                if (water < 0 || energy < 0)
-                {
-                    MessageBox.Show("Wartości nie mogą być ujemne!", "Błąd", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
+                MessageBox.Show("Podaj prawidłową, dodatnią liczbę litrów.", "Błąd");
+                return;
+            }
 
-                Measurement measurement = new Measurement(DateTime.Now, water, energy);
-                measurements.Add(measurement);
-                dataManager.SaveData(measurements);
-                LoadData();
+            if (DateInput.SelectedDate == null)
+            {
+                MessageBox.Show("Wybierz datę.");
+                return;
+            }
+
+            var measurement = new WaterMeasurement
+            {
+                Date = DateInput.SelectedDate.Value,
+                Liters = liters
+            };
+
+            DataManager.Measurements.Add(measurement);
+            LitersInput.Clear();
+            RefreshList();
+        }
+
+        private void RemoveMeasurement_Click(object sender, RoutedEventArgs e)
+        {
+            if (MeasurementList.SelectedItem is WaterMeasurement selected)
+            {
+                DataManager.Measurements.Remove(selected);
+                RefreshList();
             }
             else
             {
-                MessageBox.Show("Wprowadź poprawne liczby!", "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show("Zaznacz pomiar do usunięcia.");
             }
         }
 
-        private void RemoveSelectedMeasurement_Click(object sender, RoutedEventArgs e)
+        private void RefreshList()
         {
-            if (MeasurementList.SelectedIndex != -1)
-            {
-                int selectedIndex = MeasurementList.SelectedIndex;
-                var result = MessageBox.Show("Czy na pewno chcesz usunąć wybrany pomiar?", "Potwierdzenie", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            MeasurementList.ItemsSource = null;
+            MeasurementList.ItemsSource = DataManager.Measurements.OrderBy(m => m.Date).ToList();
+            UpdateChart();
+        }
 
-                if (result == MessageBoxResult.Yes)
-                {
-                    measurements.RemoveAt(selectedIndex);
-                    dataManager.SaveData(measurements);
-                    LoadData();
-                }
-            }
-            else
+        private void UpdateChart()
+        {
+            var sorted = DataManager.Measurements.OrderBy(m => m.Date).ToList();
+            var values = new ChartValues<double>(sorted.Select(m => m.Liters));
+            var labels = sorted.Select(m => m.Date.ToString("dd.MM")).ToArray();
+
+            WaterChart.Series = new SeriesCollection
             {
-                MessageBox.Show("Najpierw wybierz pomiar do usunięcia!", "Błąd", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
+                new LineSeries
+                {
+                    Title = "Zużycie wody",
+                    Values = values,
+                    PointGeometry = DefaultGeometries.Circle,
+                    PointGeometrySize = 10
+                }
+            };
+
+            WaterChart.AxisX[0].Labels = labels;
         }
     }
 }

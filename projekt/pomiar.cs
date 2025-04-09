@@ -1,18 +1,15 @@
 ﻿using System;
 
-namespace projekt
+namespace WaterTrackerWPF
 {
-    public class Measurement
+    public class WaterMeasurement
     {
         public DateTime Date { get; set; }
-        public double WaterUsage { get; set; }
-        public double EnergyUsage { get; set; }
+        public double Liters { get; set; }
 
-        public Measurement(DateTime date, double waterUsage, double energyUsage)
+        public override string ToString()
         {
-            Date = date;
-            WaterUsage = waterUsage;
-            EnergyUsage = energyUsage;
+            return $"{Date.ToShortDateString()} - {Liters} L";
         }
     }
 }
